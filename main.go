@@ -20,6 +20,7 @@ var port = ":8080"
 var dir http.Dir
 var ssize = false
 var modt = false
+var full = false
 var er error
 
 // Fily struct to hold single file
@@ -50,7 +51,7 @@ func main() {
 	app.Usage = "Serve any folder to local network"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:        "path, p",
+			Name:        "directory, d",
 			Usage:       "Path to folder to serve to",
 			EnvVar:      "",
 			Hidden:      false,
@@ -58,7 +59,7 @@ func main() {
 			Destination: new(string),
 		},
 		cli.StringFlag{
-			Name:        "port, o",
+			Name:        "port, p",
 			Usage:       "Port to open",
 			EnvVar:      "",
 			Hidden:      false,
@@ -73,39 +74,39 @@ func main() {
 			Destination: new(bool),
 		},
 		cli.BoolFlag{
-			Name:        "modt",
+			Name:        "modified, m",
 			Usage:       "Show the last modification time",
 			EnvVar:      "",
 			Hidden:      false,
 			Destination: new(bool),
 		},
+		cli.BoolFlag{
+			Name:        "full, f",
+			Usage:       "Print full path",
+			EnvVar:      "",
+			Hidden:      false,
+			Destination: new(bool),
+		},
 	}
-
-	fmt.Println("cli.Context------------------")
 	app.Action = func(c *cli.Context) error {
-		currentPath = c.GlobalString("path")
+		currentPath = c.GlobalString("directory")
 		dir = http.Dir(currentPath)
 		port = c.GlobalString("port")
 		ssize = c.GlobalBool("size")
+		full = c.GlobalBool("full")
 		//modt = c.GlobalString("modt")
 		fmt.Printf("Path: %s, Port %s\n", dir, port)
 		return nil
 	}
 	app.Run(os.Args)
 
-	// list files in given directory
 	//diveIntoFolder(currentPath)
 	diveDirTree(currentPath)
-	// List files recursivly
-	// List files recursivly
 
 	if err != nil {
 		log.Println(err)
 	}
 
-	//printList(args)
-	//printList("lol", currentPath, "lol")
-	//printList(args)
 	http.ListenAndServe(port, http.FileServer(dir))
 }
 
@@ -117,14 +118,15 @@ func diveDirTree(path string) {
 			if er != nil {
 				return er
 			}
-
 			if info.IsDir() {
-				args = append(args, "+"+path)
-			} else {
-				args = append(args, path)
+				args = append(args, "+")
 			}
-			args = append(args, info.Name())
-			if ssize != false {
+			if full != false {
+				args = append(args, path)
+			} else {
+				args = append(args, info.Name())
+			}
+			if ssize != false && !info.IsDir() {
 				args = append(args, strconv.FormatInt(info.Size()/1000, 10)+"Kb")
 			}
 			if modt != false {
