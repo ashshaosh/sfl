@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -95,13 +96,13 @@ func main() {
 		ssize = c.GlobalBool("size")
 		full = c.GlobalBool("full")
 		//modt = c.GlobalString("modt")
-		fmt.Printf("Path: %s, Port %s\n", dir, port)
+		fmt.Printf("Path: %s, Port %s\n\n", dir, port)
 		return nil
 	}
 	app.Run(os.Args)
 
-	//diveIntoFolder(currentPath)
-	diveDirTree(currentPath)
+	diveIntoFolder(currentPath)
+	//diveDirTree(currentPath)
 
 	if err != nil {
 		log.Println(err)
@@ -142,24 +143,34 @@ func diveDirTree(path string) {
 }
 
 func diveIntoFolder(dir string) {
-	fmt.Println("\nioutil.ReadDir------------------")
+	//fmt.Println("\nioutil.ReadDir------------------")
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, f := range files {
-
-		args = append(args, f.Name())
-		if ssize != false {
-			args = append(args, strconv.FormatInt(f.Size()/1000, 10)+"Kb")
+		if full != false {
+			args = append(args, dir+"/"+f.Name())
+		} else {
+			args = append(args, f.Name())
+		}
+		if ssize != false && !f.IsDir() {
+			fl := float64(f.Size()) / 1000000
+			sz := fmt.Sprintf("%.3f", fl)
+			args = append(args, " "+sz+"Mb ")
 		}
 		if modt != false {
-			args = append(args, f.ModTime().Local().String())
+			args = append(args, " "+f.ModTime().Local().String()+" ")
 		}
 		if f.IsDir() != false {
-			args = append(args, dir+"/"+f.Name())
-			args = append(args, "\n")
+			args = append([]string{"\n+ "}, args...)
+			//args = append(args, dir+"/"+f.Name())
+			_, err := f.re
+			if err != io.EOF {
+				args = append(args, "\n")
+			}
+
 			diveIntoFolder(dir + "/" + f.Name())
 		}
 
@@ -170,6 +181,6 @@ func diveIntoFolder(dir string) {
 }
 
 func printList(args []string) {
-	s := strings.Join(args, " ")
+	s := strings.Join(args, "")
 	fmt.Printf(s)
 }
