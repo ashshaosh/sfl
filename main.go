@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,17 +11,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/karrick/godirwalk"
 	"gopkg.in/urfave/cli.v1"
 )
 
-var args = make([]string, 5, 5)
-var currentPath = ""
-var port = ":8080"
-var dir http.Dir
-var ssize = false
-var modt = false
-var full = false
-var er error
+var (
+	args        = make([]string, 15, 15)
+	currentPath = ""
+	port        = ":8080"
+	dir         http.Dir
+	ssize       = false
+	modt        = false
+	full        = false
+	er          error
+	optQuiet    = false
+	programName string
+)
 
 // Fily struct to hold single file
 type Fily struct {
@@ -88,6 +92,13 @@ func main() {
 			Hidden:      false,
 			Destination: new(bool),
 		},
+		cli.BoolFlag{
+			Name:        "quiet, q",
+			Usage:       "Elide printing of non-critical error messages.",
+			EnvVar:      "",
+			Hidden:      false,
+			Destination: new(bool),
+		},
 	}
 	app.Action = func(c *cli.Context) error {
 		currentPath = c.GlobalString("directory")
@@ -95,14 +106,16 @@ func main() {
 		port = c.GlobalString("port")
 		ssize = c.GlobalBool("size")
 		full = c.GlobalBool("full")
+		optQuiet = c.GlobalBool("quiet")
 		//modt = c.GlobalString("modt")
 		fmt.Printf("Path: %s, Port %s\n\n", dir, port)
 		return nil
 	}
 	app.Run(os.Args)
 
-	diveIntoFolder(currentPath)
+	//diveIntoFolder(currentPath)
 	//diveDirTree(currentPath)
+	scanFolder(currentPath)
 
 	if err != nil {
 		log.Println(err)
@@ -142,20 +155,20 @@ func diveDirTree(path string) {
 	args = nil
 }
 
-func diveIntoFolder(dir string) {
-	//fmt.Println("\nioutil.ReadDir------------------")
-	files, err := ioutil.ReadDir(dir)
+func diveIntoFolder(path string) {
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, f := range files {
-		if full != false {
-			args = append(args, dir+"/"+f.Name())
+		if full != false { // how to print path
+			args = append(args, path+"/"+f.Name())
 		} else {
 			args = append(args, f.Name())
 		}
-		if ssize != false && !f.IsDir() {
+
+		if ssize != false && f.IsDir() != true { // when to print sizes
 			fl := float64(f.Size()) / 1000000
 			sz := fmt.Sprintf("%.3f", fl)
 			args = append(args, " "+sz+"Mb ")
@@ -163,24 +176,63 @@ func diveIntoFolder(dir string) {
 		if modt != false {
 			args = append(args, " "+f.ModTime().Local().String()+" ")
 		}
+
 		if f.IsDir() != false {
-			args = append([]string{"\n+ "}, args...)
-			//args = append(args, dir+"/"+f.Name())
-			_, err := f.re
-			if err != io.EOF {
-				args = append(args, "\n")
-			}
-
-			diveIntoFolder(dir + "/" + f.Name())
+			args = append([]string{"\n|><| "}, args...)
+			args = append(args, "\n")
+			diveIntoFolder(path + "/" + f.Name())
+			args = append(args, "\n")
+		} else {
+			args = append(args, "\n")
 		}
-
-		args = append(args, "\n")
 		printList(args)
 		args = nil
+	}
+}
+
+func getFInfo(f os.FileInfo) {
+	if f.IsDir() == true {
+		args = append(args, "\n|=| ")
+		diveIntoFolder(currentPath + "/" + f.Name())
 	}
 }
 
 func printList(args []string) {
 	s := strings.Join(args, "")
 	fmt.Printf(s)
+}
+
+func scanFolder(path string) {
+	err := godirwalk.Walk(path, &godirwalk.Options{
+		Callback: func(osPathname string, de *godirwalk.Dirent) error {
+			fmt.Printf("%s %s\n", de.ModeType(), osPathname)
+			return nil
+		},
+		ErrorCallback: func(osPathname string, err error) godirwalk.ErrorAction {
+			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
+			// For the purposes of this example, a simple SkipNode will suffice,
+			// although in reality perhaps additional logic might be called for.
+			return godirwalk.SkipNode
+		},
+		Unsorted: true, // set true for faster yet non-deterministic enumeration (see godoc)
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
+	}
+}
+
+func stderr(f string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, programName+": "+fmt.Sprintf(f, args...)+"\n")
+}
+
+func fatal(f string, args ...interface{}) {
+	stderr(f, args...)
+	os.Exit(1)
+}
+
+func warning(f string, args ...interface{}) {
+	if !optQuiet {
+		stderr(f, args...)
+	}
 }
