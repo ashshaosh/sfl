@@ -67,14 +67,12 @@ func main() {
 	cPath, err := os.Getwd()
 	currentPath = cPath
 	dir = http.Dir(currentPath)
-	//file params
-	//prefiks := http.StripPrefix("/static/", http.FileServer(dir))
+
 	if err != nil {
 		er = err
 		log.Println(err)
 	}
 
-	//http.Handle("/static/", prefiks)
 	app := cli.NewApp()
 	app.Name = "sfl"
 	app.Usage = "Serve any folder to local network"
@@ -154,8 +152,8 @@ func main() {
 	}
 
 	intro := &Welcome{
-		Title: `Welcome lol`,
-		Text:  `Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome Welcome `,
+		Title: `Welcome.`,
+		Text:  `This is local server, you can down/up-load files here.`,
 	}
 
 	form := &Upload{}
@@ -169,7 +167,7 @@ func main() {
 	upld = template.HTML(b.String())                    // fill var ...
 	b.Reset()
 
-	http.HandleFunc("/", fileForm)
+	http.HandleFunc("/", displayPage)
 	http.ListenAndServe(port, nil)
 }
 
@@ -190,7 +188,7 @@ func diveDirTree(path string) {
 				args = append(args, info.Name())
 			}
 			if ssize != false && info.IsDir() == false {
-				args = append(args, strconv.FormatInt(info.Size()/1000, 10)+"Kb")
+				args = append(args, " "+strconv.FormatInt(info.Size()/1000, 10)+"Kb")
 			}
 			// if modt != false {
 			// 	args = append(args, info.ModTime().Local().String())
@@ -284,11 +282,11 @@ func warning(f string, args ...interface{}) {
 	}
 }
 
-func fileForm(w http.ResponseWriter, r *http.Request) {
+func displayPage(w http.ResponseWriter, r *http.Request) {
 	var b bytes.Buffer
 	maxValueBytes := int64(10 << 20) // 10mb for holding not-files information
 	if r.Method == "GET" {
-		tit := "Work with " + currentPath + " directory"
+		tit := "Serving: " + currentPath
 		p := &Page{ // make var to hold whole page content
 			Title:         tit,  // assign page itle
 			Welcome:       wlcm, // post var to parameter
@@ -305,10 +303,13 @@ func fileForm(w http.ResponseWriter, r *http.Request) {
 
 		for {
 			part, err := mr.NextPart()
+
 			if err == io.EOF {
 				break
 			}
+
 			name := part.FormName()
+
 			if name == "" {
 				continue
 			}
@@ -337,6 +338,7 @@ func fileForm(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return
 			}
+
 			for {
 				buffer := make([]byte, 100000)
 				cBytes, err := part.Read(buffer)
@@ -347,20 +349,7 @@ func fileForm(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		fmt.Println("Upload done")
-		//fmt.Println(values)
+		fmt.Printf("Upload %s done", values)
 		fmt.Fprint(w, "Upload complete")
 	}
-}
-
-//wlcm, upld, cntnt
-func displayPage(rw http.ResponseWriter, r *http.Request) {
-
-	p := &Page{ // make var to hold whole page content
-		Title:         "Lol upload", // assign page itle
-		Welcome:       wlcm,         // post var to parameter
-		UploadForm:    upld,
-		ContentFolder: wlcm,
-	}
-	tmplt.ExecuteTemplate(rw, "index.html", p) // parse var with index.html template
 }
