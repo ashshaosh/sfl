@@ -285,17 +285,17 @@ func warning(f string, args ...interface{}) {
 }
 
 func fileForm(w http.ResponseWriter, r *http.Request) {
+	var b bytes.Buffer
+	maxValueBytes := int64(10 << 20) // 10mb for holding not-files information
 	if r.Method == "GET" {
+		tit := "Work with " + currentPath + " directory"
 		p := &Page{ // make var to hold whole page content
-			Title:         "Lol upload", // assign page itle
-			Welcome:       wlcm,         // post var to parameter
+			Title:         tit,  // assign page itle
+			Welcome:       wlcm, // post var to parameter
 			UploadForm:    upld,
 			ContentFolder: wlcm,
 		}
 		tmplt.ExecuteTemplate(w, "index.html", p)
-		// t, _ := template.ParseFiles("templates/form_upload.html")
-		// t.Execute(w, nil)
-		fmt.Printf("Upload to: %s\n", currentPath)
 	} else {
 		mr, err := r.MultipartReader()
 		values := make(map[string][]string)
@@ -303,9 +303,6 @@ func fileForm(w http.ResponseWriter, r *http.Request) {
 			panic("Failed to read multipart message: ")
 		}
 
-		//length := r.ContentLength
-		maxValueBytes := int64(10 << 20)
-		//fmt.Printf("%f", float64(maxValueBytes))
 		for {
 			part, err := mr.NextPart()
 			if err == io.EOF {
@@ -315,10 +312,10 @@ func fileForm(w http.ResponseWriter, r *http.Request) {
 			if name == "" {
 				continue
 			}
-			var b bytes.Buffer
+
 			filename := part.FileName()
 
-			if filename == "" {
+			if filename == "" { // not a file
 				n, err := io.CopyN(&b, part, maxValueBytes)
 				if err != nil && err != io.EOF {
 					fmt.Fprint(w, "Error processing form")
@@ -334,24 +331,24 @@ func fileForm(w http.ResponseWriter, r *http.Request) {
 			}
 
 			now := time.Now().Format("(Jan _2 15-04-05)-")
-			fileName := currentPath + "/" + now + filename
-			dst, err := os.Create(fileName)
+			newFilePath := currentPath + "/" + now + filename
+			dst, err := os.Create(newFilePath)
 			defer dst.Close()
 			if err != nil {
 				return
 			}
 			for {
-				buffer := make([]byte, 999999)
+				buffer := make([]byte, 100000)
 				cBytes, err := part.Read(buffer)
+				dst.Write(buffer[0:cBytes])
 				if err == io.EOF {
 					break
 				}
-				dst.Write(buffer[0:cBytes])
 			}
 		}
 
 		fmt.Println("Upload done")
-		fmt.Println(values)
+		//fmt.Println(values)
 		fmt.Fprint(w, "Upload complete")
 	}
 }
